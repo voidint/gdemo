@@ -61,7 +61,7 @@ func (c *Cron) run() {
 	for i := range c.events {
 		select {
 		case <-c.timer.C:
-			c.events[i].action()
+			go c.events[i].action()
 
 			if i < len(c.events)-1 {
 				c.timer.Reset(c.events[i+1].timestamp.Sub(time.Now()))
@@ -94,6 +94,7 @@ func main() {
 
 	e1, _ := NewEvent(now.Add(time.Millisecond*500), func() {
 		log.Printf("The event1 has been fired(%d)\n", time.Now().UnixNano())
+		time.Sleep(time.Second * 4)
 	})
 
 	e2, _ := NewEvent(now.Add(time.Millisecond*505), func() {
