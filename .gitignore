@@ -1,14 +1,37 @@
-# Binaries for programs and plugins
-*.exe
-*.dll
+# Compiled Object files, Static and Dynamic libs (Shared Objects)
+*.o
+*.a
 *.so
-*.dylib
+*.db
+*.log
+gbb.json
 
-# Test binary, build with `go test -c`
-*.test
+# Folders
+_obj
+_test
+bin
+pkg
+temp
+.vscode
+debug
 
-# Output of the go coverage tool, specifically when used with LiteIDE
-*.out
+# Architecture specific extensions/prefixes
+*.[568vq]
+[568vq].out
 
-# Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
-.glide/
+*.cgo1.go
+*.cgo2.c
+_cgo_defun.c
+_cgo_gotypes.go
+_cgo_export.*
+
+_testmain.go
+
+*.exe
+.DS_Store
+
+# Front
+node_modules/
+
+# vim
+*.sw[op]
