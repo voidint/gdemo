@@ -17,6 +17,7 @@ import (
 type Options struct {
 	All  bool
 	List bool
+	Ino  bool
 }
 
 var opts Options
@@ -24,6 +25,7 @@ var opts Options
 func init() {
 	flag.BoolVar(&opts.All, "a", false, "Include directory entries whose names begin with a dot (.).")
 	flag.BoolVar(&opts.List, "l", false, "List in long format. If the output is to a terminal, a total sum for all the file sizes is output on a line before the long listing.")
+	flag.BoolVar(&opts.Ino, "i", false, "For each file, print the file's file serial number (inode number).")
 	flag.Parse()
 }
 
@@ -51,15 +53,15 @@ func main() {
 	})
 
 	if opts.List {
-		handleError(NewListRender(target, items).Render(opts.All, os.Stdout))
+		handleError(NewListRender(target, items).Render(opts, os.Stdout))
 		return
 	}
-	handleError(NewRawRender(items).Render(opts.All, os.Stdout))
+	handleError(NewRawRender(items).Render(opts, os.Stdout))
 }
 
 // Renderer 文本渲染器
 type Renderer interface {
-	Render(all bool, out io.Writer) error
+	Render(opts Options, out io.Writer) error
 }
 
 // ListRender 列表渲染器
@@ -77,14 +79,15 @@ func NewListRender(dir string, items []os.FileInfo) Renderer {
 }
 
 // Render 渲染
-func (rd *ListRender) Render(all bool, out io.Writer) error {
+func (rd *ListRender) Render(opts Options, out io.Writer) error {
 	var total int64
 	var buf strings.Builder
 	for _, item := range rd.items {
-		if !all && strings.HasPrefix(item.Name(), ".") {
+		if !opts.All && strings.HasPrefix(item.Name(), ".") {
 			continue
 		}
 
+		var inode uint64
 		var uname, gname string
 		var nlink uint16
 
@@ -95,6 +98,7 @@ func (rd *ListRender) Render(all bool, out io.Writer) error {
 			if group, _ := user.LookupGroupId(fmt.Sprintf("%d", stat.Gid)); group != nil {
 				gname = group.Name
 			}
+			inode = stat.Ino
 			nlink = stat.Nlink
 			total += stat.Blocks
 		}
@@ -105,17 +109,33 @@ func (rd *ListRender) Render(all bool, out io.Writer) error {
 			fname = fmt.Sprintf("%s -> %s", fname, dest)
 		}
 
-		buf.WriteString(fmt.Sprintf("%s\t%d\t%s\t%s\t%d\t%d\t%d\t%s\t%s\n",
-			item.Mode().String(),
-			nlink,
-			uname,
-			gname,
-			item.Size(),
-			item.ModTime().Month(),
-			item.ModTime().Day(),
-			item.ModTime().Format("15:04"),
-			fname,
-		))
+		if opts.Ino {
+			buf.WriteString(fmt.Sprintf("%d\t%s\t%d\t%s\t%s\t%d\t%d\t%d\t%s\t%s\n",
+				inode,
+				item.Mode().String(),
+				nlink,
+				uname,
+				gname,
+				item.Size(),
+				item.ModTime().Month(),
+				item.ModTime().Day(),
+				item.ModTime().Format("15:04"),
+				fname,
+			))
+		} else {
+			buf.WriteString(fmt.Sprintf("%s\t%d\t%s\t%s\t%d\t%d\t%d\t%s\t%s\n",
+				item.Mode().String(),
+				nlink,
+				uname,
+				gname,
+				item.Size(),
+				item.ModTime().Month(),
+				item.ModTime().Day(),
+				item.ModTime().Format("15:04"),
+				fname,
+			))
+		}
+
 	}
 	fmt.Fprintln(out, fmt.Sprintf("total %d", total))
 	fmt.Fprint(out, buf.String())
@@ -135,12 +155,20 @@ func NewRawRender(items []os.FileInfo) Renderer {
 }
 
 // Render 渲染
-func (rd *RawRender) Render(all bool, out io.Writer) error {
+func (rd *RawRender) Render(opts Options, out io.Writer) error {
 	for _, item := range rd.items {
-		if !all && strings.HasPrefix(item.Name(), ".") {
+		if !opts.All && strings.HasPrefix(item.Name(), ".") {
 			continue
 		}
-		fmt.Fprintln(out, item.Name())
+		var inode uint64
+		if stat, ok := item.Sys().(*syscall.Stat_t); ok && stat != nil {
+			inode = stat.Ino
+		}
+		if opts.Ino {
+			fmt.Fprintln(out, fmt.Sprintf("%d\t%s", inode, item.Name()))
+		} else {
+			fmt.Fprintln(out, item.Name())
+		}
 	}
 	return nil
 }
